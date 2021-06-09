@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "main": "index.js",
+  "devDependencies": {
+    "markdown-it": "^12.0.6",
+    "nodemon": "^2.0.7",
+    "rollup": "^2.51.1"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "nodemon ./src/main.js"
+  }
+}
