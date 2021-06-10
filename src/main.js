@@ -5,6 +5,10 @@ import { inspect } from 'util'
 import MarkdownIt from 'markdown-it'
 
 const MD = new MarkdownIt()
+// 文件
+const FILE = 1;
+// 文件夹
+const FOLDER = 2;
 
 // const PORT = '3000'
 
@@ -39,11 +43,29 @@ const info = (...data) => {
 // })
 
 
-
-const readDir = (entry) => {
+/**
+ * 获取目录下面所有内容并返回数组
+ * @param {String} entry 入口目录
+ * @param {String} parentDir 父级文件夹名称
+ * @returns
+ * 返回格式:
+ * [
+    {
+      "dir": "2021-06-05", 目录名称
+      "children": [
+        {
+          "fileName": "test.html",  文件名
+          "content": "## test.md",  文件内容
+          "type": 1,                1 是文件 2 是文件夹
+        }
+      ],
+      "type": 2
+    },
+    { "fileName": "c.html", "content": "## c.md", "type": 1 }
+  ]
+ */
+const readDir = (entry, parentDir) => {
   const result = []
-
-
 
   // 获取所有文件
   const dirList = fs.readdirSync(entry);
@@ -57,27 +79,23 @@ const readDir = (entry) => {
     const isDir = stat.isDirectory()
 
     if (isDir) {
-      log(item, '是文件夹')
-
-      let child = readDir(location, result)
+      let child = readDir(location, item)
       const params = {
-        dir: item, // md 文件名称
+        dir: item,
         children: child,
-        type: 2
+        type: FOLDER
       }
       result.push(params)
 
     } else {
-      log(item, '不是文件夹')
-
       // 判断是否是 md 文件
       if (/\.md$/.test(item)) {
         // 同步读取 md 文件内容
         const content = fs.readFileSync(location, 'utf-8');
         const params = {
-          dir: item.replace(/\.md$/, ''), // md 文件名称
+          fileName: item.replace(/\.md$/, '.html'),
           content: content.toString(),
-          type: 1
+          type: FILE
         }
         result.push(params)
       }
@@ -87,59 +105,47 @@ const readDir = (entry) => {
   return result
 }
 
-
-const data = readDir(path.resolve('doc'))
-
-info(data)
-
-// fs.writeFileSync(path.resolve('data.js'),JSON.stringify(data),'utf-8')
-
-// 转换成 html 文件
-const transformationHtml = (filepath,item) => {
-  let template = MD.render(item.content)
-  let fileName = `${item.dir}.html`
-  fs.writeFile(`${filepath}/${fileName}`, template, 'utf8', (err) => {
-    if (err) throw err;
-    log(`${item}-->${fileName}-文件已被保存`);
-  });
+/**
+ * 写入文件
+ * @param {String} filepath 文件路径
+ * @param {String} fileName 文件名（带后缀）
+ * @param {String} content  文件内容
+ * @returns 
+ */
+const transformationHtml = (filepath, fileName, content) => {
+  fs.writeFileSync(`${filepath}/${fileName}`, content, 'utf8');
+  log(`${filepath}/${fileName}----完成`);
 }
+/**
+ * 
+ * @param {String} entry 入口地址
+ * @param {Array} data   需要写入的数据
+ */
+const build = (entry, data) => {
 
-const build = (data) => {
-
-  let filepath = path.resolve('dist')
-  // 判断是否有 dist 文件夹 没有就新建
-  if (!fs.existsSync(filepath)) {
-    fs.mkdirSync(filepath)
+  // 判断是否有文件夹 没有就新建
+  if (!fs.existsSync(entry)) {
+    fs.mkdirSync(entry)
   }
+  
   data.forEach(item => {
-    const dir = path.join(filepath, item.dir)
-    /** 
-     * type
-     * 1 文件
-     * 2 文件夹
-     */
-    if (item.type === 2) {
-      // 没有该文件夹就创建
+    if (item.type === FOLDER) {
+      const dir = path.join(entry, item.dir)
+      // 判断是否有文件夹 没有就新建
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir)
       }
-      // let { children } = item
-      // info(children,'children')
-      // children.forEach( item =>{
-      //   let template = MD.render(item.content)
-      //   let fileName = item.replace(/\.md$/, '.html')
-      //   fs.writeFile(`${filepath}/${fileName}`, template, 'utf8', (err) => {
-      //     if (err) throw err;
-      //     log(`${item}-->${fileName}-文件已被保存`);
-      //   });
-      // })
-      // transformationHtml(filepath, item)
-      build(item.children)
+      if ('children' in item && Array.isArray(item.children)) {
+        build(dir, item.children)
+      }
     } else {
-      transformationHtml(filepath, item)
+      let html = MD.render(item.content)
+      transformationHtml(entry, item.fileName, html)
     }
   })
 }
 
 
-// build(data)
+const data = readDir(path.resolve('doc'))
+
+build(path.resolve('dist'), data)
